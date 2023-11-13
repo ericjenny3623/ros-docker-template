@@ -40,14 +40,14 @@ services:
   overlay:
     extends: base
     # TODO (4.8) line below
-    image: klab:overlay-example
+    image: klab:overlay-leafblower
     build:
       context: .
       dockerfile: .devcontainer/Dockerfile
       # TODO (4.8) line below
-      target: overlay-example
+      target: overlay-leafblower
     group_add:
-      # For arduino and other serial devices
+      # For arduino
       - dialout
 
   # Developer container
@@ -63,8 +63,8 @@ services:
         - GID=${UID:-1000}
         - USERNAME=${USERNAME:-devuser}
     volumes:
-      # Mount the source code
-      - ./src/example-repo:/overlay_ws/src/example-repo:rw
+      # TODO (4.8) Mount the source code
+      - ./src/apple_harvesting_leafblower:/overlay_ws/src/apple_harvesting_leafblower:rw
       # Mount catkin build artifacts for faster rebuilds
       - ./.cache/noetic/build/:/overlay_ws/build/:rw
       - ./.cache/noetic/devel/:/overlay_ws/devel/:rw
@@ -73,7 +73,7 @@ services:
     user: ${USERNAME:-devuser}
     command: sleep infinity
 
-  # TODO Demo example for just running a launch file
-  run-example:
+  # TODO Demo example
+  run-leafblower:
     extends: overlay
-    command: roslaunch example-package example-launch.launch
+    command: roslaunch apple_harvesting_leafblower BlowerServer.launch

@@ -48,31 +48,32 @@ ENTRYPOINT [ "/entrypoint.sh" ]
 # Overlay Images!
 ##############################################################################
 # TODO (4.1) Add a new overlay
-FROM base AS overlay-example 
+FROM base AS overlay-leafblower
 
 # Create an overlay Colcon workspace
 RUN mkdir -p /overlay_ws/src
 WORKDIR /overlay_ws
 # TODO (4.2) copy the source code from your repo into the overlay
-COPY src/example-repo/ ./src/example-repo/
+COPY src/apple_harvesting_leafblower/ ./src/apple_harvesting_leafblower/
 
 ## TODO (4.5) add any dependencies to the overlay you CANNOT get from rosdeps or vcstool
-## It is preffered that you specify versions for these dependencies to avoid breaking changes
-# RUN apt-get update && apt-get install -y package
-# RUN pip3 install python-package==2.0.1
+## Need to install phidget22 because its not in the main rosdep list
+RUN apt-get update && apt-get install -y wget
+RUN wget -qO- http://www.phidgets.com/gpgkey/pubring.gpg | apt-key add - && \
+    echo 'deb http://www.phidgets.com/debian focal main' > /etc/apt/sources.list.d/phidgets.list && \
+    apt-get update && apt-get install -y libphidget22
+RUN pip3 install Phidget22
 
 ## TODO (4.6) run the ros setup script, install dependencies, and build the package. 
-## You might need to comment this out if you are running into issues (or dont have a ros package yet)
 RUN source /klab_ws/devel/setup.bash \
  && rosdep install --from-paths src --ignore-src --rosdistro ${ROS_DISTRO} -y \
  && catkin_make
-
 
 ##############################################################################
 # Development Image #
 ##############################################################################\
 ## TODO (4.8) update the dev image to use your overlay
-FROM overlay-example as dev
+FROM overlay-leafblower as dev
 
 # Dev container arguments
 ARG USERNAME=devuser
