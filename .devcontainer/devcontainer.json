@@ -1,16 +1,9 @@
 {
     "name": "ROS 1 Development Container",
-    "privileged": true, // TODO(ejenny) This is bad. See: https://www.losant.com/blog/how-to-access-serial-devices-in-docker 
-    "build": {
-        "dockerfile": "Dockerfile",
-        "target": "dev",
-        // "args": {
-        //     "UID": "${UID:-1000}",
-        //     "GID": "${UID:-1000}",
-        //     "USERNAME": "eric-devuser"
-        // },
-        "context": ".."
-    },
+    // "privileged": true, // (ejenny) Try to avoid using privileged containers
+    "dockerComposeFile": "../docker-compose.yaml",
+    "service": "dev",
+    // TODO we can add services to possibly stack our containers but need to figure that out
     "customizations": {
         "vscode": {
             "extensions":[
@@ -30,17 +23,6 @@
         "ROS_AUTOMATIC_DISCOVERY_RANGE": "LOCALHOST",
         "ROS_DOMAIN_ID": "42"
     },
-    "runArgs": [
-        "--net=host",
-        "-e", "DISPLAY=${env:DISPLAY}"
-    ],
-    "mounts": [
-       "source=/tmp/.X11-unix,target=/tmp/.X11-unix,type=bind,consistency=cached",
-        "source=/dev/dri,target=/dev/dri,type=bind,consistency=cached",
-        "source=${localWorkspaceFolder}/cache/noetic/build,target=/leafblower_ws/build,type=bind",
-        "source=${localWorkspaceFolder}/cache/noetic/install,target=/leafblower_ws/install,type=bind",
-        "source=${localWorkspaceFolder}/cache/noetic/log,target=/leafblower_ws/log,type=bind"
-    ],
+    "workspaceFolder": "/overlay_ws",
     "postCreateCommand": "bash"
-    // "postCreateCommand": "sudo rosdep update && sudo rosdep install --from-paths src --ignore-src -y && sudo chown -R eric /leafblower_ws/"
 }

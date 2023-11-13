@@ -1,15 +1,7 @@
-# Docker Compose file for TurtleBot3 Behavior Examples
-#
 # Usage:
-#
-# To build the images:
-#   docker compose build
-#
-# To start up a specific service by name:
-#   docker compose up <service_name>
-#
-# To open an interactive shell to a running container:
-#   docker exec -it <container_name> bash
+#   To build the images:  docker compose build
+#   To start up a specific service by name:  docker compose up <service_name>
+#   To open an interactive shell to a running container:  docker exec -it <container_name> bash
 
 version: "1.0"
 services:
@@ -31,8 +23,7 @@ services:
     # Needed to display graphical applications
     privileged: True
     environment:
-      ## Needed to define a TurtleBot3 model type
-      # - TURTLEBOT3_MODEL=${TURTLEBOT3_MODEL:-waffle_pi}
+      ## Define any environment variables required for your application here.
       # Allows graphical programs in the container.
       - DISPLAY=${DISPLAY}
       - QT_X11_NO_MITSHM=1
@@ -41,21 +32,27 @@ services:
       # Allows graphical programs in the container.
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
       - ${XAUTHORITY:-$HOME/.Xauthority}:/root/.Xauthority
+      # Allows devices to be accessed from the container.
+      - /dev:/dev
 
   # Overlay image containing the example source code.
-  leafblower:
+  # TODO (4.8) change the image and target to match your overlay image.
+  overlay:
     extends: base
-    image: klab:ov-leafblower
-    devices:
-      - /dev/ttyUSB0:/dev/ttyUSB0
+    # TODO (4.8) line below
+    image: klab:overlay-example
     build:
       context: .
       dockerfile: .devcontainer/Dockerfile
-      target: ov-leafblower
+      # TODO (4.8) line below
+      target: overlay-example
+    group_add:
+      # For arduino and other serial devices
+      - dialout
 
   # Developer container
   dev:
-    extends: leafblower
+    extends: overlay
     image: klab:dev
     build:
       context: .
@@ -67,31 +64,16 @@ services:
         - USERNAME=${USERNAME:-devuser}
     volumes:
       # Mount the source code
-      - ./apple_harvesting_leafblower:/leafblower_ws/src/apple_harvesting_leafblower:rw
-      # # Mount colcon build artifacts for faster rebuilds
-      # - ./.colcon/build/:/leafblower_ws/build/:rw
-      # - ./.colcon/install/:/leafblower_ws/install/:rw
-      # - ./.colcon/log/:/leafblower_ws/log/:rw
+      - ./src/example-repo:/overlay_ws/src/example-repo:rw
+      # Mount catkin build artifacts for faster rebuilds
+      - ./.cache/noetic/build/:/overlay_ws/build/:rw
+      - ./.cache/noetic/devel/:/overlay_ws/devel/:rw
+      # Mount git config to allow git to be used from within the container
+      - ${HOME}/.gitconfig:/etc/gitconfig:ro
     user: ${USERNAME:-devuser}
     command: sleep infinity
-    devices:
-      - /dev/ttyUSB0:/dev/ttyUSB0
 
-  # # Runs basic TurtleBot3 simulation
-  # sim:
-  #   extends: overlay
-  #   command: ros2 launch turtlebot3_gazebo turtlebot3_world.launch.py
-
-  # # Demo world
-  # demo-world:
-  #   extends: overlay
-  #   command: ros2 launch tb3_worlds tb3_demo_world.launch.py
-
-  # # Behavior demo using Python and py_trees
-  # demo-behavior-py:
-  #   extends: overlay
-  #   command: >
-  #     ros2 launch tb3_autonomy tb3_demo_behavior_py.launch.py
-  #     tree_type:=${BT_TYPE:?}
-  #     enable_vision:=${ENABLE_VISION:?}
-  #     target_color:=${TARGET_COLOR:?}
+  # TODO Demo example for just running a launch file
+  run-example:
+    extends: overlay
+    command: roslaunch example-package example-launch.launch

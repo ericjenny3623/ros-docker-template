@@ -15,9 +15,9 @@ then
 fi
 
 # Source the overlay workspace, if built
-if [ -f /leafblower_ws/install/setup.bash ]
+if [ -f /overlay_ws/devel/setup.bash ]
 then
-  source /leafblower/install/setup.bash
+  source /overlay_ws/devel/setup.bash
   # export GAZEBO_MODEL_PATH=$GAZEBO_MODEL_PATH:$(ros2 pkg prefix tb3_worlds)/share/tb3_worlds/models
   echo "Sourced autonomy overlay workspace"
 fi
