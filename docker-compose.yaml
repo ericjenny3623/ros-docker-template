@@ -1,0 +1,97 @@
+# Docker Compose file for TurtleBot3 Behavior Examples
+#
+# Usage:
+#
+# To build the images:
+#   docker compose build
+#
+# To start up a specific service by name:
+#   docker compose up <service_name>
+#
+# To open an interactive shell to a running container:
+#   docker exec -it <container_name> bash
+
+version: "1.0"
+services:
+  # Base image containing dependencies.
+  base:
+    image: klab:base
+    build:
+      context: .
+      dockerfile: .devcontainer/Dockerfile
+      args:
+        ROS_DISTRO: noetic
+      target: base
+    # Interactive shell
+    stdin_open: true
+    tty: true
+    # Networking and IPC for ROS 2
+    network_mode: host
+    ipc: host
+    # Needed to display graphical applications
+    privileged: True
+    environment:
+      ## Needed to define a TurtleBot3 model type
+      # - TURTLEBOT3_MODEL=${TURTLEBOT3_MODEL:-waffle_pi}
+      # Allows graphical programs in the container.
+      - DISPLAY=${DISPLAY}
+      - QT_X11_NO_MITSHM=1
+      - NVIDIA_DRIVER_CAPABILITIES=all
+    volumes:
+      # Allows graphical programs in the container.
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - ${XAUTHORITY:-$HOME/.Xauthority}:/root/.Xauthority
+
+  # Overlay image containing the example source code.
+  leafblower:
+    extends: base
+    image: klab:ov-leafblower
+    devices:
+      - /dev/ttyUSB0:/dev/ttyUSB0
+    build:
+      context: .
+      dockerfile: .devcontainer/Dockerfile
+      target: ov-leafblower
+
+  # Developer container
+  dev:
+    extends: leafblower
+    image: klab:dev
+    build:
+      context: .
+      dockerfile: .devcontainer/Dockerfile
+      target: dev
+      args:
+        - UID=${UID:-1000}
+        - GID=${UID:-1000}
+        - USERNAME=${USERNAME:-devuser}
+    volumes:
+      # Mount the source code
+      - ./apple_harvesting_leafblower:/leafblower_ws/src/apple_harvesting_leafblower:rw
+      # # Mount colcon build artifacts for faster rebuilds
+      # - ./.colcon/build/:/leafblower_ws/build/:rw
+      # - ./.colcon/install/:/leafblower_ws/install/:rw
+      # - ./.colcon/log/:/leafblower_ws/log/:rw
+    user: ${USERNAME:-devuser}
+    command: sleep infinity
+    devices:
+      - /dev/ttyUSB0:/dev/ttyUSB0
+
+  # # Runs basic TurtleBot3 simulation
+  # sim:
+  #   extends: overlay
+  #   command: ros2 launch turtlebot3_gazebo turtlebot3_world.launch.py
+
+  # # Demo world
+  # demo-world:
+  #   extends: overlay
+  #   command: ros2 launch tb3_worlds tb3_demo_world.launch.py
+
+  # # Behavior demo using Python and py_trees
+  # demo-behavior-py:
+  #   extends: overlay
+  #   command: >
+  #     ros2 launch tb3_autonomy tb3_demo_behavior_py.launch.py
+  #     tree_type:=${BT_TYPE:?}
+  #     enable_vision:=${ENABLE_VISION:?}
+  #     target_color:=${TARGET_COLOR:?}
