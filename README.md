@@ -43,6 +43,7 @@ For installing requirements, it is preferred to use rosdeps, vcstool, or finally
 
 #### Rosdeps
 TODO. For now, see  https://github.com/Kantor-Lab/apple_harvest/tree/ros1-actions for an example.
+https://github.com/ros/rosdistro/blob/master/rosdep/python.yaml
 
 #### vcstool
 TODO
