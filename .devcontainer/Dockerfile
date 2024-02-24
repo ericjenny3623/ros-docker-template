@@ -6,7 +6,7 @@ ARG ROS_DISTRO=noetic
 ##############################################################################
 FROM osrf/ros:${ROS_DISTRO}-desktop-full as base
 ENV ROS_DISTRO=${ROS_DISTRO}
-ENV BASE_WS=ros_ws
+ENV BASE_WS=base_ws
 ENV OVERLAY_WS=overlay_ws
 SHELL ["/bin/bash", "-c"]
 
@@ -19,14 +19,15 @@ RUN apt-get install python3-vcstool
 # Install additional Python modules
 RUN pip3 install matplotlib transforms3d
 
-# FOR TRACKING: ultralytics is yolov8 and torch is for raft_stero (moved to prevent cache miss)
+# FOR TRACKING: ultralytics is yolov8 and torch is for raft_stero
+#  (moved to prevent cache miss and slow reinstall)
 RUN pip3 install ultralytics torch 
 
 # Create Colcon workspace with external dependencies
 RUN mkdir -p /${BASE_WS}/src
 WORKDIR /${BASE_WS}/src
-COPY src/ros_package_dependencies.repos .
-RUN vcs import < ros_package_dependencies.repos 
+COPY packages/ros_pack_deps.repos .
+RUN vcs import < ros_pack_deps.repos 
 
 # Build the base Colcon workspace, installing dependencies first.
 WORKDIR /${BASE_WS}
@@ -54,11 +55,13 @@ ENTRYPOINT [ "/entrypoint.sh" ]
 # TODO (4.1) Add a new overlay
 FROM base AS overlay-leafblower
 
+ENV BUILD_OVERLAY="source /${BASE_WS}/devel/setup.bash \ && rosdep install --from-paths src --ignore-src --rosdistro ${ROS_DISTRO} -y \ && catkin_make"
+
 # Create an overlay Colcon workspace
 RUN mkdir -p /${OVERLAY_WS}/src
 WORKDIR /${OVERLAY_WS}
 # TODO (4.2) copy the source code from your repo into the overlay
-COPY src/apple_harvesting_leafblower/ ./src/apple_harvesting_leafblower/
+COPY packages/apple_harvesting_leafblower/ ./src/apple_harvesting_leafblower/
 
 ## TODO (4.5) add any dependencies to the overlay you CANNOT get from rosdeps or vcstool
 ## Need to install phidget22 because its not in the main rosdep list
@@ -68,10 +71,8 @@ RUN wget -qO- http://www.phidgets.com/gpgkey/pubring.gpg | apt-key add - && \
     apt-get update && apt-get install -y libphidget22
 RUN pip3 install Phidget22
 
-## TODO (4.6) run the ros setup script, install dependencies, and build the package. 
-RUN source /${BASE_WS}/devel/setup.bash \
- && rosdep install --from-paths src --ignore-src --rosdistro ${ROS_DISTRO} -y \
- && catkin_make
+# ## TODO (4.6) run the ros setup script, install dependencies, and build the package. 
+# RUN ${BUILD_OVERLAY}
  
 ##############################################################################
 #  TRACKING
@@ -81,43 +82,49 @@ FROM overlay-leafblower as overlay-tracking
 
 RUN mkdir -p /${OVERLAY_WS}/src
 WORKDIR /${OVERLAY_WS}/src
-COPY src/private.repos .
 
-COPY /src/yoloV8_seg ./yoloV8_seg
-COPY /src/raft_stereo ./raft_stereo
+RUN pip3 install open3d # For yolo_v8
+RUN pip3 install opt_einsum # For RAFT
+
+COPY /packages/yolo_v8_seg ./yolo_v8_seg
+COPY /packages/raft_stereo_wrapper ./raft_stereo_wrapper
+
+COPY /packages/raft_stereo_wrapper/dependencies.repos .raft_stereo_deps.repos
+RUN vcs import < .raft_stereo_deps.repos ; mv raft_stereo_core /opt/ros/${ROS_DISTRO}/lib/dist-packages/
 
 WORKDIR /${OVERLAY_WS}
-RUN source /${BASE_WS}/devel/setup.bash \
- && rosdep install --from-paths src --ignore-src --rosdistro ${ROS_DISTRO} -y \
- && catkin_make
+# RUN ${BUILD_OVERLAY}
 
 ##############################################################################
 #  Spinnaker camera
 ##############################################################################
 FROM overlay-tracking as overlay-camera
 
+# Install Spinnaker SDK
 RUN mkdir -p /setup/spinnaker_lib
 WORKDIR /setup
 COPY .devcontainer/spinnaker-3.2.0.57-amd64-pkg-20.04.tar.gz .
 RUN tar -xvf spinnaker-* --strip=1 -C spinnaker_lib
 RUN apt-get update && apt-get install -y libusb-1.0-0 libavcodec58 libavformat58 libswscale5 \
     libswresample3 libavutil56 libusb-1.0-0 qt5-default
+
 WORKDIR /setup/spinnaker_lib
-COPY .devcontainer/install_lib_spinnaker.sh .
+COPY packages/firefly_camera_driver/install_lib_spinnaker.sh .
 RUN chmod +x install_lib_spinnaker.sh
 RUN ./install_lib_spinnaker.sh --auto
 
 RUN mkdir -p /${OVERLAY_WS}/src
 WORKDIR /${OVERLAY_WS}/src
-COPY /src/flir_camera_driver ./flir_camera_driver
-ADD https://github.com/ros-drivers/pointgrey_camera_driver.git /setup/pointgrey_ros_lib
-RUN find /setup/pointgrey_ros_lib -maxdepth 1 -type f -delete
-RUN mv /setup/pointgrey_ros_lib/* /${OVERLAY_WS}/src/
+COPY packages/firefly_camera_driver/dependencies.repos .firefly_camera_driver_deps.repos
+RUN vcs import < .firefly_camera_driver_deps.repos
+
+# Add flirimaging so we can access the camera without privileged
+RUN groupadd -g 1002 flirimaging ; newgrp flirimaging # TODO this needs to match host group id
+
+COPY packages/firefly_camera_driver/ ./firefly_camera_driver
 
 WORKDIR /${OVERLAY_WS}
-RUN source /${BASE_WS}/devel/setup.bash \
- && rosdep install --from-paths src --ignore-src --rosdistro ${ROS_DISTRO} -y \
- && catkin_make
+RUN ${BUILD_OVERLAY}
 
 ##############################################################################
 # Development Image #

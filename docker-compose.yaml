@@ -23,7 +23,7 @@ services:
     network_mode: host
     ipc: host
     # Needed to display graphical applications
-    # privileged: True
+    privileged: True # WARNING Bad!! TEMP (just for spinnaker debugging)
     environment:
       ## Define any environment variables required for your application here.
       # Allows graphical programs in the container.
@@ -39,7 +39,7 @@ services:
 
   # Overlay image containing the example source code.
   # TODO (4.8) change the image and target to match your overlay image.
-  overlay:
+  overlay1:
     extends: base
     # TODO (4.8) line below
     image: klab:overlay-leafblower
@@ -52,24 +52,37 @@ services:
       # For arduino
       - dialout
 
+  overlay2:
+    extends: overlay1
+    # TODO (4.8) line below
+    image: klab:overlay-camera
+    build:
+      context: .
+      dockerfile: .devcontainer/Dockerfile
+      # TODO (4.8) line below
+      target: overlay-camera
+    group_add:
+      # For spinakker cameras
+      - flirimaging
+
   # Developer container
   dev:
-    extends: overlay
+    extends: overlay2
     image: klab:dev
     build:
       context: .
       dockerfile: .devcontainer/Dockerfile
       target: dev
       args:
-        - UID=${UID:-1001}
+        - UID=1001
         - USERNAME=${USERNAME:-devuser}
     volumes:
       # TODO (4.8) Mount the source code
       # TODO can this be replaced with variable?
-      - ./src/apple_harvesting_leafblower:/overlay_ws/src/apple_harvesting_leafblower:rw
-      - ./src/yoloV8_seg:/overlay_ws/src/yoloV8_seg:rw
-      - ./src/raft_stereo:/overlay_ws/src/raft_stereo:rw
-      - ./src/flir_camera_driver:/overlay_ws/src/flir_camera_driver:rw
+      - ./packages/apple_harvesting_leafblower:/overlay_ws/src/apple_harvesting_leafblower:rw
+      - ./packages/yolo_v8_seg:/overlay_ws/src/yolo_v8_seg:rw
+      - ./packages/raft_stereo_wrapper:/overlay_ws/src/raft_stereo_wrapper:rw
+      - ./packages/firefly_camera_driver:/overlay_ws/src/firefly_camera_driver:rw
       # Mount catkin build artifacts for faster rebuilds
       - ./.cache/noetic/build/:/overlay_ws/build/:rw
       - ./.cache/noetic/devel/:/overlay_ws/devel/:rw
@@ -80,5 +93,5 @@ services:
 
   # TODO Demo example
   run-leafblower:
-    extends: overlay
+    extends: overlay1
     command: roslaunch apple_harvesting_leafblower BlowerServer.launch

@@ -1,9 +1,0 @@
-repositories:
-    yolov8_ros:
-        type: git
-        url: git@github.com:avcs2019/yoloV8_seg.git
-        version: main
-    raft_ros:
-        type: git
-        url: git@github.com:avcs2019/raft_stereo.git
-        version: main
