@@ -4,13 +4,7 @@ ARG ROS_DISTRO=noetic
 ##############################################################################
 # Base Image for Any Project #
 ##############################################################################
-FROM osrf/ros:${ROS_DISTRO}-desktop-full as base
-ENV ROS_DISTRO=${ROS_DISTRO}
-ENV BASE_WS=base_ws
-ENV OVERLAY_WS=overlay_ws
-ENV BUILD_BASE="source /opt/ros/${ROS_DISTRO}/setup.bash && apt-get update -y && rosdep install --from-paths src --ignore-src --rosdistro ${ROS_DISTRO} -y && catkin_make"
-ENV BUILD_OVERLAY="source /${BASE_WS}/devel/setup.bash && rosdep install --from-paths src --ignore-src --rosdistro ${ROS_DISTRO} -y && catkin_make"
-SHELL ["/bin/bash", "-c"]
+FROM osrf/ros:${ROS_DISTRO}-desktop-full as pip-install
 
 # Install basic apt packages
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -18,12 +12,32 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
  python3-pip python3-opencv python3-tk python3-pyqt5.qtwebengine 
 RUN apt-get install python3-vcstool
 
+# TODO move all pip installs here to prevent cache misses
+
 # Install additional Python modules
+RUN pip3 install --upgrade pip
 RUN pip3 install matplotlib transforms3d
 
 # FOR TRACKING: ultralytics is yolov8 and torch is for raft_stero
 #  (moved to prevent cache miss and slow reinstall)
 RUN pip3 install ultralytics torch 
+
+# For RAFT
+RUN pip3 install open3d opt_einsum --ignore-installed PyYaml
+
+# For leafblower
+RUN pip3 install Phidget22 
+
+##############################################################################
+
+FROM pip-install as base
+
+ENV ROS_DISTRO=${ROS_DISTRO}
+ENV BASE_WS=base_ws
+ENV OVERLAY_WS=overlay_ws
+ENV BUILD_BASE="source /opt/ros/${ROS_DISTRO}/setup.bash && apt-get update -y && rosdep install --from-paths src --ignore-src --rosdistro ${ROS_DISTRO} -y && catkin_make"
+ENV BUILD_OVERLAY="source /${BASE_WS}/devel/setup.bash && rosdep install --from-paths src --ignore-src --rosdistro ${ROS_DISTRO} -y && catkin_make"
+SHELL ["/bin/bash", "-c"]
 
 # Create Colcon workspace with external dependencies
 RUN mkdir -p /${BASE_WS}/src
@@ -66,7 +80,6 @@ RUN apt-get update && apt-get install -y wget
 RUN wget -qO- http://www.phidgets.com/gpgkey/pubring.gpg | apt-key add - && \
     echo 'deb http://www.phidgets.com/debian focal main' > /etc/apt/sources.list.d/phidgets.list && \
     apt-get update && apt-get install -y libphidget22
-RUN pip3 install Phidget22
 
 # ## TODO (4.6) run the ros setup script, install dependencies, and build the package. 
 # RUN ${BUILD_OVERLAY}
@@ -79,9 +92,6 @@ FROM overlay-leafblower as overlay-tracking
 
 RUN mkdir -p /${OVERLAY_WS}/src
 WORKDIR /${OVERLAY_WS}/src
-
-RUN pip3 install open3d # For yolo_v8
-RUN pip3 install opt_einsum # For RAFT
 
 COPY /packages/yolo_v8_seg ./yolo_v8_seg
 COPY /packages/raft_stereo_wrapper ./raft_stereo_wrapper

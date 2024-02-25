@@ -11,11 +11,12 @@
                 "ms-vscode.cpptools",
                 "ms-vscode.cpptools-themes",
                 "twxs.cmake",
-                // "ms-iot.vscode-ros",
+                "ms-iot.vscode-ros",
                 "eamodio.gitlens",
                 "github.copilot",
                 "mhutchie.git-graph"
-            ]
+            ],
+            "settings": {"terminal.integrated.defaultProfile.linux": "bash"}
         }
     },
     "containerEnv": {

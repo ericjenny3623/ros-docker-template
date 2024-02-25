@@ -83,6 +83,8 @@ services:
       - ./packages/yolo_v8_seg:/overlay_ws/src/yolo_v8_seg:rw
       - ./packages/raft_stereo_wrapper:/overlay_ws/src/raft_stereo_wrapper:rw
       - ./packages/firefly_camera_driver:/overlay_ws/src/firefly_camera_driver:rw
+      # Mount share folder for data
+      - ./share:/overlay_ws/share:rw
       # Mount catkin build artifacts for faster rebuilds
       - ./.cache/noetic/build/:/overlay_ws/build/:rw
       - ./.cache/noetic/devel/:/overlay_ws/devel/:rw
