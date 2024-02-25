@@ -8,6 +8,8 @@ FROM osrf/ros:${ROS_DISTRO}-desktop-full as base
 ENV ROS_DISTRO=${ROS_DISTRO}
 ENV BASE_WS=base_ws
 ENV OVERLAY_WS=overlay_ws
+ENV BUILD_BASE="source /opt/ros/${ROS_DISTRO}/setup.bash && apt-get update -y && rosdep install --from-paths src --ignore-src --rosdistro ${ROS_DISTRO} -y && catkin_make"
+ENV BUILD_OVERLAY="source /${BASE_WS}/devel/setup.bash && rosdep install --from-paths src --ignore-src --rosdistro ${ROS_DISTRO} -y && catkin_make"
 SHELL ["/bin/bash", "-c"]
 
 # Install basic apt packages
@@ -31,10 +33,7 @@ RUN vcs import < ros_pack_deps.repos
 
 # Build the base Colcon workspace, installing dependencies first.
 WORKDIR /${BASE_WS}
-RUN source /opt/ros/${ROS_DISTRO}/setup.bash \
- && apt-get update -y \
- && rosdep install --from-paths src --ignore-src --rosdistro ${ROS_DISTRO} -y \
- && catkin_make
+RUN eval ${BUILD_BASE}
 
 # Remove display warnings
 RUN mkdir /tmp/runtime-root
@@ -55,13 +54,11 @@ ENTRYPOINT [ "/entrypoint.sh" ]
 # TODO (4.1) Add a new overlay
 FROM base AS overlay-leafblower
 
-ENV BUILD_OVERLAY="source /${BASE_WS}/devel/setup.bash \ && rosdep install --from-paths src --ignore-src --rosdistro ${ROS_DISTRO} -y \ && catkin_make"
-
 # Create an overlay Colcon workspace
 RUN mkdir -p /${OVERLAY_WS}/src
 WORKDIR /${OVERLAY_WS}
 # TODO (4.2) copy the source code from your repo into the overlay
-COPY packages/apple_harvesting_leafblower/ ./src/apple_harvesting_leafblower/
+COPY packages/apple_harvesting_leafblower/  src/apple_harvesting_leafblower/
 
 ## TODO (4.5) add any dependencies to the overlay you CANNOT get from rosdeps or vcstool
 ## Need to install phidget22 because its not in the main rosdep list
@@ -73,7 +70,7 @@ RUN pip3 install Phidget22
 
 # ## TODO (4.6) run the ros setup script, install dependencies, and build the package. 
 # RUN ${BUILD_OVERLAY}
- 
+
 ##############################################################################
 #  TRACKING
 ##############################################################################
@@ -89,9 +86,6 @@ RUN pip3 install opt_einsum # For RAFT
 COPY /packages/yolo_v8_seg ./yolo_v8_seg
 COPY /packages/raft_stereo_wrapper ./raft_stereo_wrapper
 
-COPY /packages/raft_stereo_wrapper/dependencies.repos .raft_stereo_deps.repos
-RUN vcs import < .raft_stereo_deps.repos ; mv raft_stereo_core /opt/ros/${ROS_DISTRO}/lib/dist-packages/
-
 WORKDIR /${OVERLAY_WS}
 # RUN ${BUILD_OVERLAY}
 
@@ -103,28 +97,32 @@ FROM overlay-tracking as overlay-camera
 # Install Spinnaker SDK
 RUN mkdir -p /setup/spinnaker_lib
 WORKDIR /setup
+# The spinnaker library for container (ubuntu 20.04) must be in .devcontainer
+#  Copy and extract
 COPY .devcontainer/spinnaker-3.2.0.57-amd64-pkg-20.04.tar.gz .
 RUN tar -xvf spinnaker-* --strip=1 -C spinnaker_lib
 RUN apt-get update && apt-get install -y libusb-1.0-0 libavcodec58 libavformat58 libswscale5 \
     libswresample3 libavutil56 libusb-1.0-0 qt5-default
-
+# Run custom install script with no prompts
 WORKDIR /setup/spinnaker_lib
 COPY packages/firefly_camera_driver/install_lib_spinnaker.sh .
 RUN chmod +x install_lib_spinnaker.sh
 RUN ./install_lib_spinnaker.sh --auto
 
-RUN mkdir -p /${OVERLAY_WS}/src
-WORKDIR /${OVERLAY_WS}/src
+# RUN mkdir -p /${BASE_WS}/src # You might need to make dir if it hasnt already been by another layer   
+WORKDIR /${BASE_WS}/src
 COPY packages/firefly_camera_driver/dependencies.repos .firefly_camera_driver_deps.repos
 RUN vcs import < .firefly_camera_driver_deps.repos
+WORKDIR /${BASE_WS}
+RUN eval ${BUILD_BASE}
 
 # Add flirimaging so we can access the camera without privileged
-RUN groupadd -g 1002 flirimaging ; newgrp flirimaging # TODO this needs to match host group id
+RUN groupadd -g 1002 flirimaging && newgrp flirimaging # TODO this needs to match host group id
 
-COPY packages/firefly_camera_driver/ ./firefly_camera_driver
-
+# Copy our source and build
 WORKDIR /${OVERLAY_WS}
-RUN ${BUILD_OVERLAY}
+COPY packages/firefly_camera_driver/ src/firefly_camera_driver
+RUN eval ${BUILD_OVERLAY}
 
 ##############################################################################
 # Development Image #
