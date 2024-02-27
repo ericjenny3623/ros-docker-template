@@ -93,6 +93,17 @@ services:
     user: ${USERNAME:-devuser}
     command: sleep infinity
 
+  nvidia-dev:
+    extends: dev
+    runtime: nvidia
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
   # TODO Demo example
   run-leafblower:
     extends: overlay1

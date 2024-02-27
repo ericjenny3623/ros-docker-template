@@ -20,10 +20,11 @@ One trick of this docker image is to match the user ID to the local user (mostly
 ## How To Use:
 You can follow along these steps inside this template repo by searching for *TODO (4.1)* (for example).
 1. Install Docker on your system: https://docs.docker.com/get-docker/. Make sure to add your user to the Docker group with *sudo groupadd docker ; sudo usermod -aG docker $USER ; newgrp docker*
-2. Clone this template as a starting point.
-3. Create/Clone the various projects you will be working on into the src directory in this template
+2. Optional: install nvidia-container-toolkit: https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html. You'll need to make sure the nvidia drivers are installed properly on your host. You can check this using "nvidia-smi". If you don't have an nvidia GPU, you'll need to make sure the devcontainer does not run the nvidia-dev target and instead runs just dev. 
+3. Clone this template as a starting point.
+4. Create/Clone the various projects you will be working on into the src directory in this template
 <!-- TODO use submodules? -->
-4. Add overlay(s) for your project. **There is an example of this in the Dockerfile.** Steps 1, 2, & 5-7 are all done in *.devcontainer/Dockerfile*. 
+1. Add overlay(s) for your project. **There is an example of this in the Dockerfile.** Steps 1, 2, & 5-7 are all done in *.devcontainer/Dockerfile*. 
     > Generally, it is advised to make a seperate overlay for anything that could be shared between projects. If everything you are developing is project unique, just make one overlay.
     1. Create a new overlay in the Dockerfile using FROM base as overlay-*name*
     2. Copy the source code from ./src/*project-name* to overlay_ws/src/*project-name*
@@ -33,7 +34,7 @@ You can follow along these steps inside this template repo by searching for *TOD
     6. Source setup.sh in the project and build the project
     7. Now, update dev to build off of your overlay by editing the dev definition to be: FROM overlay-*name* as dev. (If you want to switch projects, change this line).
     8. Then update *docker-compose.yaml* to mount ./src/*project-name* to overlay_ws/src/*project-name*. The copy in step 2 is not persistent. The mount means that changes you make in the dev container will be reflected on your machine as well.
- 5. Launch the docker image. I'd recommend:
+ 2. Launch the docker image. I'd recommend:
     1. First, try building the docker compose using *docker compose build* (then *docker compose run dev* if it builds succesfully). It is slightly easier to debug your Docker file/compose since it is easier to see the error message vs. when running the build through the devcontainer extension. 
     2. Once you have debugged the docker build, then feel free to run using Ctrl+Shift+P (opens the VScode command palette)->Devcontainers: rebuild and relaunch in container (you might need to install the devcontainer extension in VScode). The devcontainer is set to launch the (compose) service *dev*. If you want to run a different service, change this in the *.devcontainer/devcontainer.json* spec file. 
     3. Now you should be in a VScode window "inside" of the Docker container where you can create terminals (run *bash* first) and run ros like normal.  
@@ -46,9 +47,9 @@ TODO. For now, see  https://github.com/Kantor-Lab/apple_harvest/tree/ros1-action
 https://github.com/ros/rosdistro/blob/master/rosdep/python.yaml
 
 #### vcstool
-TODO
+Use this for public ros packages that you want to be cloned into the base workspace.
 
-### Communicating to serial devices
+### Communicating with physical devices
 The current solution (on linux) for Docker to access serial devices is to ensure that the devices have proper udev rules set up so that the true user can access them without root, and then run the docker image with that user's ID. The provided template mounts the /dev directory so that the Docker image can access devices that the local user could.
 
 #### Arduino
@@ -56,6 +57,11 @@ For arduino, this means adding the Docker image to the dialout group using the c
 
 #### Phidgets
 This is handled through udev rules (see various links in resources). **You need to run setup_udev_phidgets.sh with root on the host machine**.
+
+### Spinnaker cameras
+
+#### TLDR
+Run the setup_host.sh script inside each package that has one to make sure the host and the container have all of the right permissions.
 
 ### Other
 

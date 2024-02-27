@@ -58,8 +58,7 @@ ENV NO_AT_BRIDGE 1
 # Set up the entrypoint
 WORKDIR /${BASE_WS}
 COPY .devcontainer/entrypoint.sh /
-COPY .devcontainer/bash_setup.sh /
-RUN chmod +x /entrypoint.sh /bash_setup.sh
+RUN chmod +x /entrypoint.sh 
 ENTRYPOINT [ "/entrypoint.sh" ]
 
 ##############################################################################
@@ -165,4 +164,4 @@ RUN apt-get update && apt-get install -y usbutils udev
 
 # Set the user and source entrypoint in the user's .bashrc file
 USER ${USERNAME}
-RUN echo "source /bash_setup.sh" >> /home/${USERNAME}/.bashrc
+RUN echo "source /entrypoint.sh" >> /home/${USERNAME}/.bashrc

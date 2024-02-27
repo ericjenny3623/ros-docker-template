@@ -2,7 +2,7 @@
     "name": "ROS 1 Development Container",
     // "privileged": true, // (ejenny) Try to avoid using privileged containers
     "dockerComposeFile": "../docker-compose.yaml",
-    "service": "dev",
+    "service": "nvidia-dev",
     // TODO we can add services to possibly stack our containers but need to figure that out
     "customizations": {
         "vscode": {
