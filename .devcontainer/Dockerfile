@@ -2,7 +2,7 @@
 ARG ROS_DISTRO=noetic
 
 ##############################################################################
-# Base Image for Any Project #
+# PIP installations to reduce cache misses #
 ##############################################################################
 FROM osrf/ros:${ROS_DISTRO}-desktop-full as pip-install
 
@@ -12,7 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
  python3-pip python3-opencv python3-tk python3-pyqt5.qtwebengine 
 RUN apt-get install python3-vcstool
 
-# TODO move all pip installs here to prevent cache misses
+# TODO pip installs should be here and in their respective build stages
 
 # Install additional Python modules
 RUN pip3 install --upgrade pip
@@ -29,8 +29,51 @@ RUN pip3 install open3d opt_einsum --ignore-installed PyYaml
 RUN pip3 install Phidget22 
 
 ##############################################################################
+# CUDA #
+##############################################################################
 
-FROM pip-install as base
+FROM pip-install as cuda-install
+
+ARG DEBIAN_FRONTEND=noninteractive
+
+# Prerequisites
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    wget software-properties-common gnupg2 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Enable contrib on debian to get required
+# https://packages.debian.org/bullseye/glx-alternative-nvidia
+# Enable non-free for nvidia-cuda-dev
+# https://packages.debian.org/bullseye/nvidia-cuda-dev
+
+ENV CUDA_DOWNLOAD_OSSTRING=ubuntu
+ENV CUDA_DOWNLOAD_VERSTRING=2004
+ENV CUDA_DOWLOAD_KEY_ID=3bf863cc
+
+RUN \
+  wget https://developer.download.nvidia.com/compute/cuda/repos/${CUDA_DOWNLOAD_OSSTRING}${CUDA_DOWNLOAD_VERSTRING}/x86_64/cuda-${CUDA_DOWNLOAD_OSSTRING}${CUDA_DOWNLOAD_VERSTRING}.pin \
+  && mv cuda-${CUDA_DOWNLOAD_OSSTRING}${CUDA_DOWNLOAD_VERSTRING}.pin /etc/apt/preferences.d/cuda-repository-pin-600 && \
+  add-apt-repository restricted && \
+  apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/${CUDA_DOWNLOAD_OSSTRING}${CUDA_DOWNLOAD_VERSTRING}/x86_64/${CUDA_DOWLOAD_KEY_ID}.pub \
+  && add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/${CUDA_DOWNLOAD_OSSTRING}${CUDA_DOWNLOAD_VERSTRING}/x86_64/ /" \
+  && apt-get update \
+  && apt-get -y install cuda \
+  && rm -rf /var/lib/apt/lists/*
+
+# File conflict problem with libnvidia-ml.so.1 and libcuda.so.1
+# https://github.com/NVIDIA/nvidia-docker/issues/1551
+RUN rm -rf /usr/lib/x86_64-linux-gnu/libnv*
+RUN rm -rf /usr/lib/x86_64-linux-gnu/libcuda*
+
+# TODO(tfoote) Add documentation of why these are required
+ENV PATH=/usr/local/cuda/bin${PATH:+:${PATH}}
+ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64/stubs:/usr/local/cuda/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}
+
+##############################################################################
+# Base Image for Any Project #
+##############################################################################
+
+FROM cuda-install as base
 
 ENV ROS_DISTRO=${ROS_DISTRO}
 ENV BASE_WS=base_ws
@@ -93,7 +136,11 @@ RUN mkdir -p /${OVERLAY_WS}/src
 WORKDIR /${OVERLAY_WS}/src
 
 COPY /packages/yolo_v8_seg ./yolo_v8_seg
+
 COPY /packages/raft_stereo_wrapper ./raft_stereo_wrapper
+RUN pip3 install ./raft_stereo_wrapper/src/raft_stereo_core/sampler -t /${OVERLAY_WS}/devel/lib/python3/dist-packages
+
+COPY /packages/tracking_pipeline ./tracking_pipeline
 
 WORKDIR /${OVERLAY_WS}
 # RUN ${BUILD_OVERLAY}
@@ -146,7 +193,7 @@ ARG GID=${UID}
 
 # Install extra tools for development
 RUN apt-get update && apt-get install -y --no-install-recommends \
- gdb gdbserver nano
+ gdb gdbserver nano screen
 
 # Create new user and home directory
 RUN groupadd --gid $GID $USERNAME \
